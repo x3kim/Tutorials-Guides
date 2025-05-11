@@ -1,6 +1,6 @@
-# My Tutorials & Guides Collection 📚
+# My Tutorials, Guides & Template Collection 📚
 
-Welcome to my personal collection of tutorials and guides! This repository is intended to organize my knowledge and potentially make it accessible to others.
+Welcome to my personal collection of tutorials, guides and templates! This repository is intended to organize my knowledge and potentially make it accessible to others.
 
 ---
 
