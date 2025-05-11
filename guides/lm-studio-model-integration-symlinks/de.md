@@ -107,6 +107,7 @@ function Add-ModelSymlink {
         Write-Error "Fehler beim Erstellen des Symlinks: $_"
     }
 }
+```
 
 ---
 
@@ -135,11 +136,15 @@ Sobald du die Funktion `Add-ModelSymlink` in deiner Administrator-PowerShell-Sit
 Add-ModelSymlink -ModelName "llama3-8b-instruct.Q5_K_M.gguf" `
                  -SourcePath "C:\AIModels\Common\medium\llama3-8b-instruct.Q5_K_M.gguf" `
                  -Category "lmstudio-community"
+```
+
 ### Beispiel 2: Andere Kategorie verwenden
 ```powershell
 Add-ModelSymlink -ModelName "mistral-7b-instruct.Q5_K_M.gguf" `
                  -SourcePath "C:\AIModels\Common\medium\mistral-7b-instruct.Q5_K_M.gguf" `
                  -Category "hugging-quants"
+```
+
 ### Beispiel 3: Batch-Verarbeitung mehrerer Modelle
 ```powershell
 $models = @(
@@ -162,6 +167,7 @@ $models = @(
 foreach ($model in $models) {
     Add-ModelSymlink @model
 }
+```
 
 ---
 
