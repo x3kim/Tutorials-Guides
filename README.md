@@ -1,34 +1,74 @@
-# My Tutorials, Guides & Template Collection 📚
+# My Tech Toolbox: Scripts, Guides & Templates 🛠️📚
 
-Welcome to my personal collection of tutorials, guides and templates! This repository is intended to organize my knowledge and potentially make it accessible to others.
-
-## 📙 Available Guides
-
-Click on the guide name below to expand its description and access the link:
-
-<details open>
-<summary>### 📚 LM Studio</summary>
-
-*   [**Model Integration with Symlinks**](./guides/LM-Studio/LM-Studio-LLM-symlinks/README.md)
-    *   This guide explains how to efficiently manage models in LM Studio using symbolic links. This method helps save disk space and improves organization, especially if you use models across multiple AI applications.
-    *   **Topics Covered / Tags:** `Windows`, `PowerShell`, `Symlinks`, `LLM`, `LM Studio`, `Model Management`, `KI`, `AI`
-</details>
-
-<details open>
-<summary>### 🍃 Paperless-ngx</summary>
-
-*   [**Document Type Guide & Suggestions**](./guides/Paperless-ngx/Paperless-ngx_document_types/README.md)
-    *   This guide provides recommended document types for organizing your digital documents in Paperless-ngx, aiming for a balance between specificity and generality. It offers suggestions for types, tags, and correspondents to help you find your files easily.
-    *   **Topics Covered / Tags:** `Paperless-ngx`, `Document Management`, `Organization`, `Document Types`, `Tags`
-</details>
-
-\*(More guides will be added here in the future!)
+Welcome to my personal collection of scripts, guides, and templates! This repository serves as my digital toolbox, organizing useful utilities, setup procedures, and reusable configurations. The goal is to streamline my workflows and potentially share helpful resources with others.
 
 ---
 
+## 🧰 Available Resources
+
+This collection is organized into different categories. Click on a category or resource name to explore.
+
+### ⚙️ Automation Scripts
+
+Scripts designed to automate setup processes, configurations, or repetitive tasks.
+
+<details open>
+<summary>#### 🐳 Docker & Portainer (Proxmox VE LXC)</summary>
+
+*   [**Automated Docker & Portainer Installation for Proxmox LXC**](./scripts/pve/lxc-docker-portainer-install.sh)
+    *   This Bash script automates the complete installation of Docker and Portainer CE within a Debian-based Proxmox VE LXC container. It handles system updates/upgrades, dependency installation, Docker repository setup, Portainer volume creation, and offers an interactive verbose mode. The script also attempts to display the Portainer access URL with the server's IP.
+    *   **Functionality:** LXC Setup, Docker Install, Portainer Install
+    *   **Tags:** `Proxmox VE`, `LXC`, `Docker`, `Portainer`, `Bash`, `Automation`, `Server Setup`, `Containerization`, `Debian`, `Ubuntu`
+</details>
+
+*(More scripts will be added here in the future!)*
+
+---
+
+### 📙 Guides & Tutorials
+
+Step-by-step instructions, explanations, and best practice guides for various tools and technologies.
+
+<details open>
+<summary>#### 📚 LM Studio</summary>
+
+*   [**Model Integration with Symlinks**](./guides/LM-Studio/LM-Studio-LLM-symlinks/README.md)
+    *   This guide explains how to efficiently manage models in LM Studio using symbolic links. This method helps save disk space and improves organization, especially if you use models across multiple AI applications.
+    *   **Resource Type:** Guide
+    *   **Tags:** `Windows`, `PowerShell`, `Symlinks`, `LLM`, `LM Studio`, `Model Management`, `AI`
+</details>
+
+<details open>
+<summary>#### 🍃 Paperless-ngx</summary>
+
+*   [**Document Type Guide & Suggestions**](./guides/Paperless-ngx/Paperless-ngx_document_types/README.md)
+    *   This guide provides recommended document types for organizing your digital documents in Paperless-ngx, aiming for a balance between specificity and generality. It offers suggestions for types, tags, and correspondents to help you find your files easily.
+    *   **Resource Type:** Guide
+    *   **Tags:** `Paperless-ngx`, `Document Management`, `Organization`, `Document Types`, `Tags`
+</details>
+
+*(More guides will be added here in the future!)*
+
+---
+
+<!--
+### 📄 Templates (Beispiel-Sektion, wenn du welche hinzufügst)
+
+Reusable configuration files, project starters, or document templates.
+
+<details>
+<summary>#### 📝 Example Template</summary>
+
+*   [**My Awesome Config Template**](./templates/example_template/config.example.json)
+    *   A brief description of what this template is for.
+    *   **Resource Type:** Configuration Template
+    *   **Tags:** `JSON`, `Configuration`, `Example`
+</details>
+-->
+
 ## 🤝 Contributing
 
-While this is primarily a personal collection, suggestions or corrections are welcome! Feel free to create an "Issue" or a "Pull Request".
+While this is primarily a personal collection, suggestions, corrections, or contributions are welcome! Please feel free to create an "Issue" or a "Pull Request" if you have ideas for improvements or new additions.
 
 ---
 
