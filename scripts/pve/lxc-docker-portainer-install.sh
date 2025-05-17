@@ -34,6 +34,8 @@ E_LINK="🔗"
 E_PENGUIN="🐧"
 E_SHIP="🚢"
 E_EYES="👀"
+E_UPDATE="🔄" # Für Updates
+E_CLEAN="🧹"  # Für Aufräumarbeiten
 
 # --- Hilfsfunktionen für die Ausgabe ---
 print_header() {
@@ -73,11 +75,11 @@ prompt_user_select() {
 run_command() {
     if [ "$VERBOSE_MODE" = true ]; then
         echo -e "${C_DIM}↪ Executing: $*${C_OFF}"
-        "$@"
+        "$@" # Führt den Befehl aus und zeigt seine gesamte Ausgabe
     else
-        "$@" >/dev/null 2>&1
+        "$@" >/dev/null 2>&1 # Führt den Befehl aus und unterdrückt die Ausgabe
     fi
-    return $?
+    return $? # Gibt den Exit-Code des letzten Befehls zurück
 }
 
 # --- Funktion zum Ermitteln der primären IP-Adresse ---
@@ -93,8 +95,7 @@ get_primary_ip() {
     if [ -n "$ip_address" ]; then
         echo "$ip_address"
     else
-        # Hier wird der spezielle Rückgabewert gesetzt, wenn keine IP gefunden wurde
-        echo "NO_IP_FOUND"
+        echo "NO_IP_FOUND" # Spezieller Rückgabewert, wenn keine IP gefunden wurde
     fi
 }
 
@@ -129,13 +130,25 @@ else
   print_info "Using '${C_BOLD}sudo${C_OFF}' for privileged operations."
 fi
 
-# --- Docker Installation ---
-print_phase "1/2" "${E_PENGUIN} Installing Docker"
+# --- Systemaktualisierung ---
+print_phase "0/3" "${E_UPDATE} System Update & Upgrade" # Neue Phase
 
-print_step "Updating system package lists and installing dependencies"
+print_step "Updating package lists"
 run_command $SUDO_CMD apt-get update
+print_success "Package lists updated."
+
+print_step "Upgrading installed packages"
+# Hinweis: 'apt-get upgrade -y' kann je nach Systemumfang und anstehenden Updates länger dauern.
+run_command $SUDO_CMD apt-get upgrade -y
+print_success "System packages upgraded."
+
+
+# --- Docker Installation ---
+print_phase "1/3" "${E_PENGUIN} Installing Docker" # Phasennummer angepasst
+
+print_step "Installing dependencies (ca-certificates, curl)" # Präzisiert
 run_command $SUDO_CMD apt-get install -y ca-certificates curl
-print_success "System prepared."
+print_success "Dependencies installed."
 
 print_step "Adding Docker GPG Key"
 run_command $SUDO_CMD install -m 0755 -d /etc/apt/keyrings
@@ -157,7 +170,6 @@ else
     exit 1
 fi
 
-# Im Verbose-Modus zeigen wir den Inhalt, der in die Datei geschrieben wird
 if [ "$VERBOSE_MODE" = true ]; then
     echo -e "${C_DIM}↪ Writing to /etc/apt/sources.list.d/docker.list:${C_OFF}"
     echo -e "${C_DIM}  deb [arch=$(dpkg --print-architecture) signed-by=/etc/apt/keyrings/docker.asc] https://download.docker.com/linux/debian \"$VERSION_CODENAME\" stable${C_OFF}"
@@ -166,12 +178,17 @@ echo \
   "deb [arch=$(dpkg --print-architecture) signed-by=/etc/apt/keyrings/docker.asc] https://download.docker.com/linux/debian \
   \"$VERSION_CODENAME\" stable" | \
   $SUDO_CMD tee /etc/apt/sources.list.d/docker.list > /dev/null
-run_command $SUDO_CMD apt-get update
+run_command $SUDO_CMD apt-get update # Erneutes Update nach Hinzufügen des Docker-Repos
 print_success "Docker repository added and package lists updated."
 
 print_step "Installing Docker packages ${E_BOX}"
 run_command $SUDO_CMD apt-get install -y docker-ce docker-ce-cli containerd.io docker-buildx-plugin docker-compose-plugin
 print_success "Docker CE, CLI, Containerd and plugins successfully installed!"
+
+print_step "Cleaning up unused packages and APT cache ${E_CLEAN}" # Neuer Schritt
+run_command $SUDO_CMD apt-get autoremove -y
+run_command $SUDO_CMD apt-get clean -y
+print_success "System cleaned up."
 
 # Optional: Benutzer zur Docker-Gruppe hinzufügen
 target_user_for_docker_group=""
@@ -211,7 +228,7 @@ fi
 print_success "${E_PENGUIN} Docker installation completed!"
 
 # --- Portainer Installation ---
-print_phase "2/2" "${E_SHIP} Installing Portainer"
+print_phase "2/3" "${E_SHIP} Installing Portainer" # Phasennummer angepasst
 
 print_step "Creating Portainer data volume 'portainer_data'"
 if $SUDO_CMD docker volume inspect portainer_data >/dev/null 2>&1; then
@@ -277,11 +294,10 @@ if [ "$SERVER_IP" == "NO_IP_FOUND" ]; then
     echo -e "  ${C_YELLOW}${E_WARN} Could not automatically determine server IP address. ${E_PROMPT}${C_OFF}"
     echo -e "  ${C_WHITE}Please replace ${C_BOLD}<YOUR_SERVER_IP_OR_HOSTNAME>${C_OFF} with your actual server IP or hostname:${C_OFF}"
     echo -e "  ${C_UNDERLINE}${C_BLUE}https://<YOUR_SERVER_IP_OR_HOSTNAME>:9443${C_OFF} ${E_LINK}"
-    echo -e "  (Copy: https://<YOUR_SERVER_IP_OR_HOSTNAME>:9443 )"
+    echo -e "  (Copy: https://<YOUR_SERVER_IP_OR_HOSTNAME>:9443)"
 else
-    # Anklickbarer Link (funktioniert in vielen modernen Terminals)
-    echo -e "  ${C_UNDERLINE}${C_BLUE}https://$(echo "$SERVER_IP" | sed 's/\([.]\)/\\\1/g'):9443${C_OFF} ${E_LINK}"
-    echo -e "  (If the link is not clickable, copy: https://${SERVER_IP}:9443 )"
+    echo -e "  ${C_UNDERLINE}${C_BLUE}https://${SERVER_IP}:9443${C_OFF} ${E_LINK}"
+    echo -e "  (If the link is not clickable, copy: https://${SERVER_IP}:9443)"
 fi
 
 echo -e "\n${C_WHITE}On first access, you will need to create an administrator account for Portainer.${C_OFF}"
