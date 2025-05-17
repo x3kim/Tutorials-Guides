@@ -12,8 +12,8 @@ This collection is organized into different categories. Click on a category or r
 
 Scripts designed to automate setup processes, configurations, or repetitive tasks.
 
-<details open>
-<summary>#### 🐳 Docker & Portainer (Proxmox VE LXC)</summary>
+<details>
+<summary>🐳 Docker & Portainer (Proxmox VE LXC)</summary>
 
 *   [**Automated Docker & Portainer Installation for Proxmox LXC**](./scripts/pve/lxc-docker-portainer-install.sh)
     *   This Bash script automates the complete installation of Docker and Portainer CE within a Debian-based Proxmox VE LXC container. It handles system updates/upgrades, dependency installation, Docker repository setup, Portainer volume creation, and offers an interactive verbose mode. The script also attempts to display the Portainer access URL with the server's IP.
@@ -29,8 +29,8 @@ Scripts designed to automate setup processes, configurations, or repetitive task
 
 Step-by-step instructions, explanations, and best practice guides for various tools and technologies.
 
-<details open>
-<summary>#### 📚 LM Studio</summary>
+<details>
+<summary>📚 LM Studio</summary>
 
 *   [**Model Integration with Symlinks**](./guides/LM-Studio/LM-Studio-LLM-symlinks/README.md)
     *   This guide explains how to efficiently manage models in LM Studio using symbolic links. This method helps save disk space and improves organization, especially if you use models across multiple AI applications.
@@ -38,8 +38,8 @@ Step-by-step instructions, explanations, and best practice guides for various to
     *   **Tags:** `Windows`, `PowerShell`, `Symlinks`, `LLM`, `LM Studio`, `Model Management`, `AI`
 </details>
 
-<details open>
-<summary>#### 🍃 Paperless-ngx</summary>
+<details>
+<summary>🍃 Paperless-ngx</summary>
 
 *   [**Document Type Guide & Suggestions**](./guides/Paperless-ngx/Paperless-ngx_document_types/README.md)
     *   This guide provides recommended document types for organizing your digital documents in Paperless-ngx, aiming for a balance between specificity and generality. It offers suggestions for types, tags, and correspondents to help you find your files easily.
