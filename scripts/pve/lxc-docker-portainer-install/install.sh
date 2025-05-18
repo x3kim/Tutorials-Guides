@@ -1,12 +1,12 @@
 #!/bin/bash
 
-# Stoppt das Skript sofort, wenn ein Befehl fehlschlägt
+# Stops the script immediately if a command fails
 set -e
 
-# --- Standardmodus: wird jetzt interaktiv gesetzt ---
-VERBOSE_MODE=false # Standardwert, falls Abfrage übersprungen wird
+# --- Default mode: now set interactively ---
+VERBOSE_MODE=false # Default value if prompt is skipped
 
-# --- Farben und Formatierungen ---
+# --- Colors and Formatting ---
 C_OFF='\033[0m'       # Text Reset
 C_RED='\033[0;31m'          # Red
 C_GREEN='\033[0;32m'        # Green
@@ -34,10 +34,10 @@ E_LINK="🔗"
 E_PENGUIN="🐧"
 E_SHIP="🚢"
 E_EYES="👀"
-E_UPDATE="🔄" # Für Updates
-E_CLEAN="🧹"  # Für Aufräumarbeiten
+E_UPDATE="🔄" # For updates
+E_CLEAN="🧹"  # For cleanup tasks
 
-# --- Hilfsfunktionen für die Ausgabe ---
+# --- Helper functions for output ---
 print_header() {
     echo -e "\n${C_BLUE}${C_BOLD}=========================================================${C_OFF}"
     echo -e "${C_BLUE}${C_BOLD}      $1      ${C_OFF}"
@@ -67,43 +67,43 @@ print_info() {
 prompt_user_select() {
     local prompt_message="$1"
     local var_name="$2"
-    local options_text="$3" # z.B. "(y/N)"
+    local options_text="$3" # e.g., "(y/N)" or "[default: 8000]"
     read -r -p "$(echo -e "${C_YELLOW}${E_PROMPT}  ${prompt_message} ${options_text}: ${C_OFF}")" "$var_name"
 }
 
-# --- Funktion zum Ausführen von Befehlen (berücksichtigt Verbose-Modus) ---
+# --- Function to execute commands (respects Verbose mode) ---
 run_command() {
     if [ "$VERBOSE_MODE" = true ]; then
         echo -e "${C_DIM}↪ Executing: $*${C_OFF}"
-        "$@" # Führt den Befehl aus und zeigt seine gesamte Ausgabe
+        "$@" # Executes the command and shows its full output
     else
-        "$@" >/dev/null 2>&1 # Führt den Befehl aus und unterdrückt die Ausgabe
+        "$@" >/dev/null 2>&1 # Executes the command and suppresses its output
     fi
-    return $? # Gibt den Exit-Code des letzten Befehls zurück
+    return $? # Returns the exit code of the last command
 }
 
-# --- Funktion zum Ermitteln der primären IP-Adresse ---
+# --- Function to determine the primary IP address ---
 get_primary_ip() {
-    # Versucht, die IP von 'ip route get 1.1.1.1' (verlässlicher)
-    # oder als Fallback von 'hostname -I' (kann mehrere IPs liefern)
+    # Tries to get the IP from 'ip route get 1.1.1.1' (more reliable)
+    # or as a fallback from 'hostname -I' (can return multiple IPs)
     local ip_address
     ip_address=$(ip route get 1.1.1.1 2>/dev/null | awk -F"src " 'NR==1{print $2}' | awk '{print $1}')
     if [ -z "$ip_address" ]; then
-        ip_address=$(hostname -I | awk '{print $1}') # Nimmt die erste IP, falls mehrere
+        ip_address=$(hostname -I | awk '{print $1}') # Takes the first IP if multiple exist
     fi
 
     if [ -n "$ip_address" ]; then
         echo "$ip_address"
     else
-        echo "NO_IP_FOUND" # Spezieller Rückgabewert, wenn keine IP gefunden wurde
+        echo "NO_IP_FOUND" # Special return value if no IP was found
     fi
 }
 
-# === SKRIPTSTART ===
+# === SCRIPT START ===
 clear
 print_header "${E_PENGUIN} Docker & ${E_SHIP} Portainer Installation Assistant ${E_ROCKET}"
 
-# Interaktive Auswahl für Verbose-Modus
+# Interactive selection for Verbose mode
 prompt_user_select "Do you want to enable detailed output mode (Verbose)?" VERBOSE_CHOICE "(y/N)"
 if [[ "$VERBOSE_CHOICE" =~ ^[yY](es|ES)?$ ]]; then
     VERBOSE_MODE=true
@@ -112,9 +112,9 @@ else
     VERBOSE_MODE=false
     print_info "Standard mode (compact output)."
 fi
-echo # Leerzeile
+echo # Blank line
 
-# Prüfen, ob das Skript mit Root-Rechten ausgeführt wird
+# Check if the script is running with root privileges
 SUDO_CMD=""
 CURRENT_USER_IS_ROOT=false
 if [ "$(id -u)" -eq 0 ]; then
@@ -130,23 +130,23 @@ else
   print_info "Using '${C_BOLD}sudo${C_OFF}' for privileged operations."
 fi
 
-# --- Systemaktualisierung ---
-print_phase "0/3" "${E_UPDATE} System Update & Upgrade" # Neue Phase
+# --- System Update & Upgrade ---
+print_phase "0/3" "${E_UPDATE} System Update & Upgrade" # New phase
 
 print_step "Updating package lists"
 run_command $SUDO_CMD apt-get update
 print_success "Package lists updated."
 
 print_step "Upgrading installed packages"
-# Hinweis: 'apt-get upgrade -y' kann je nach Systemumfang und anstehenden Updates länger dauern.
+# Note: 'apt-get upgrade -y' can take longer depending on the system scope and pending updates.
 run_command $SUDO_CMD apt-get upgrade -y
 print_success "System packages upgraded."
 
 
 # --- Docker Installation ---
-print_phase "1/3" "${E_PENGUIN} Installing Docker" # Phasennummer angepasst
+print_phase "1/3" "${E_PENGUIN} Installing Docker" # Phase number adjusted
 
-print_step "Installing dependencies (ca-certificates, curl)" # Präzisiert
+print_step "Installing dependencies (ca-certificates, curl)" # Specified dependencies
 run_command $SUDO_CMD apt-get install -y ca-certificates curl
 print_success "Dependencies installed."
 
@@ -178,19 +178,19 @@ echo \
   "deb [arch=$(dpkg --print-architecture) signed-by=/etc/apt/keyrings/docker.asc] https://download.docker.com/linux/debian \
   \"$VERSION_CODENAME\" stable" | \
   $SUDO_CMD tee /etc/apt/sources.list.d/docker.list > /dev/null
-run_command $SUDO_CMD apt-get update # Erneutes Update nach Hinzufügen des Docker-Repos
+run_command $SUDO_CMD apt-get update # Update again after adding the Docker repo
 print_success "Docker repository added and package lists updated."
 
 print_step "Installing Docker packages ${E_BOX}"
 run_command $SUDO_CMD apt-get install -y docker-ce docker-ce-cli containerd.io docker-buildx-plugin docker-compose-plugin
 print_success "Docker CE, CLI, Containerd and plugins successfully installed!"
 
-print_step "Cleaning up unused packages and APT cache ${E_CLEAN}" # Neuer Schritt
+print_step "Cleaning up unused packages and APT cache ${E_CLEAN}" # New step
 run_command $SUDO_CMD apt-get autoremove -y
 run_command $SUDO_CMD apt-get clean -y
 print_success "System cleaned up."
 
-# Optional: Benutzer zur Docker-Gruppe hinzufügen
+# Optional: Add user to the Docker group
 target_user_for_docker_group=""
 if [ "$CURRENT_USER_IS_ROOT" = true ]; then
     prompt_user_select "You are logged in as root. Do you want to add a regular user to the Docker group?" user_to_add_choice "(Enter username or 'N' to skip)"
@@ -228,7 +228,32 @@ fi
 print_success "${E_PENGUIN} Docker installation completed!"
 
 # --- Portainer Installation ---
-print_phase "2/3" "${E_SHIP} Installing Portainer" # Phasennummer angepasst
+print_phase "2/3" "${E_SHIP} Installing Portainer" # Phase number adjusted
+
+# --- Portainer Port Configuration ---
+DEFAULT_PORTAINER_HTTP_HOST_PORT="8000"
+PORTAINER_HTTPS_HOST_PORT="9443" # Standard HTTPS port for Portainer UI, used in final message
+
+echo -e "\n${C_BLUE}${E_GEAR} Portainer Host Port Configuration:${C_OFF}"
+print_info "Portainer UI is primarily accessed via HTTPS (typically port ${PORTAINER_HTTPS_HOST_PORT} on your host)."
+print_info "Portainer also exposes an HTTP service (internally on its port 8000)."
+print_info "This HTTP service usually redirects to HTTPS or is used for other features (like Edge Agent server port)."
+
+prompt_user_select "Enter the ${C_BOLD}external host port${C_OFF} to map to Portainer's internal HTTP port (8000)" CHOSEN_PORTAINER_HTTP_HOST_PORT "[default: ${DEFAULT_PORTAINER_HTTP_HOST_PORT}]"
+
+if [[ -z "$CHOSEN_PORTAINER_HTTP_HOST_PORT" ]]; then
+    PORTAINER_HTTP_HOST_PORT="$DEFAULT_PORTAINER_HTTP_HOST_PORT"
+    print_info "Using default external HTTP port for Portainer: ${C_BOLD}${PORTAINER_HTTP_HOST_PORT}${C_OFF}"
+elif [[ "$CHOSEN_PORTAINER_HTTP_HOST_PORT" =~ ^[0-9]+$ ]] && [ "$CHOSEN_PORTAINER_HTTP_HOST_PORT" -ge 1 ] && [ "$CHOSEN_PORTAINER_HTTP_HOST_PORT" -le 65535 ]; then
+    PORTAINER_HTTP_HOST_PORT="$CHOSEN_PORTAINER_HTTP_HOST_PORT"
+    print_info "Using custom external HTTP port for Portainer: ${C_BOLD}${PORTAINER_HTTP_HOST_PORT}${C_OFF}"
+else
+    print_warning "Invalid port '${CHOSEN_PORTAINER_HTTP_HOST_PORT}'. Must be a number between 1 and 65535 (or empty for default)."
+    print_warning "Using default external HTTP port: ${C_BOLD}${DEFAULT_PORTAINER_HTTP_HOST_PORT}${C_OFF}"
+    PORTAINER_HTTP_HOST_PORT="$DEFAULT_PORTAINER_HTTP_HOST_PORT"
+fi
+echo # Blank line
+
 
 print_step "Creating Portainer data volume 'portainer_data'"
 if $SUDO_CMD docker volume inspect portainer_data >/dev/null 2>&1; then
@@ -254,15 +279,18 @@ if $SUDO_CMD docker ps -a --format '{{.Names}}' | grep -Eq "^${container_name}$"
         print_success "Existing Portainer container removed."
     else
         print_warning "Portainer installation aborted as a container with the same name exists and was not removed."
-        exit 1
+        exit 1 # Exit script if user chooses not to remove existing container
     fi
 fi
 
 print_step "Starting Portainer server container (portainer/portainer-ce:lts)"
+# Portainer internal HTTP port is 8000, internal HTTPS port is 9443.
+# We map host's $PORTAINER_HTTP_HOST_PORT to container's 8000.
+# We map host's $PORTAINER_HTTPS_HOST_PORT to container's 9443.
 if [ "$VERBOSE_MODE" = true ]; then
     $SUDO_CMD docker run -d \
-        -p 8000:8000 \
-        -p 9443:9443 \
+        -p "${PORTAINER_HTTP_HOST_PORT}":8000 \
+        -p "${PORTAINER_HTTPS_HOST_PORT}":9443 \
         --name "$container_name" \
         --restart=always \
         -v /var/run/docker.sock:/var/run/docker.sock \
@@ -270,8 +298,8 @@ if [ "$VERBOSE_MODE" = true ]; then
         portainer/portainer-ce:lts
 else
     $SUDO_CMD docker run -d \
-        -p 8000:8000 \
-        -p 9443:9443 \
+        -p "${PORTAINER_HTTP_HOST_PORT}":8000 \
+        -p "${PORTAINER_HTTPS_HOST_PORT}":9443 \
         --name "$container_name" \
         --restart=always \
         -v /var/run/docker.sock:/var/run/docker.sock \
@@ -282,23 +310,34 @@ print_success "Portainer server container successfully started!"
 
 print_success "${E_SHIP} Portainer installation completed!"
 
-# --- Abschlussmeldung ---
-SERVER_IP=$(get_primary_ip) # IP-Adresse ermitteln
+# --- Final Message ---
+SERVER_IP=$(get_primary_ip) # Determine IP address
 
 echo -e "\n${C_GREEN}${C_BOLD}=========================================================${C_OFF}"
 echo -e "${C_GREEN}${C_BOLD}      ${E_PARTY} Installation successfully completed! ${E_PARTY}      ${C_OFF}"
 echo -e "${C_GREEN}${C_BOLD}=========================================================${C_OFF}\n"
-echo -e "${C_WHITE}Portainer should now be accessible at:${C_OFF}"
+echo -e "${C_WHITE}Portainer should now be accessible via HTTPS at:${C_OFF}"
 
 if [ "$SERVER_IP" == "NO_IP_FOUND" ]; then
     echo -e "  ${C_YELLOW}${E_WARN} Could not automatically determine server IP address. ${E_PROMPT}${C_OFF}"
     echo -e "  ${C_WHITE}Please replace ${C_BOLD}<YOUR_SERVER_IP_OR_HOSTNAME>${C_OFF} with your actual server IP or hostname:${C_OFF}"
-    echo -e "  ${C_UNDERLINE}${C_BLUE}https://<YOUR_SERVER_IP_OR_HOSTNAME>:9443${C_OFF} ${E_LINK}"
-    echo -e "  (Copy: https://<YOUR_SERVER_IP_OR_HOSTNAME>:9443)"
+    echo -e "  Primary access: ${C_UNDERLINE}${C_BLUE}https://<YOUR_SERVER_IP_OR_HOSTNAME>:${PORTAINER_HTTPS_HOST_PORT}${C_OFF} ${E_LINK}"
+    echo -e "  (Copy: https://<YOUR_SERVER_IP_OR_HOSTNAME>:${PORTAINER_HTTPS_HOST_PORT})"
 else
-    echo -e "  ${C_UNDERLINE}${C_BLUE}https://${SERVER_IP}:9443${C_OFF} ${E_LINK}"
-    echo -e "  (If the link is not clickable, copy: https://${SERVER_IP}:9443)"
+    echo -e "  Primary access: ${C_UNDERLINE}${C_BLUE}https://${SERVER_IP}:${PORTAINER_HTTPS_HOST_PORT}${C_OFF} ${E_LINK}"
+    echo -e "  (If the link is not clickable, copy: https://${SERVER_IP}:${PORTAINER_HTTPS_HOST_PORT})"
 fi
+
+if [ "$SERVER_IP" != "NO_IP_FOUND" ]; then
+    if [ "$PORTAINER_HTTP_HOST_PORT" != "$DEFAULT_PORTAINER_HTTP_HOST_PORT" ]; then
+        echo -e "\n${C_WHITE}Note: Portainer's internal HTTP port (8000) has been mapped to external host port ${C_BOLD}${PORTAINER_HTTP_HOST_PORT}${C_OFF}.${C_OFF}"
+        echo -e "${C_WHITE}Accessing http://${SERVER_IP}:${PORTAINER_HTTP_HOST_PORT} will typically redirect to the HTTPS URL above.${C_OFF}"
+    else
+        # Default HTTP port 8000 is used
+        echo -e "${C_DIM}HTTP access (http://${SERVER_IP}:${PORTAINER_HTTP_HOST_PORT}) usually redirects to the HTTPS URL above.${C_OFF}"
+    fi
+fi
+
 
 echo -e "\n${C_WHITE}On first access, you will need to create an administrator account for Portainer.${C_OFF}"
 
