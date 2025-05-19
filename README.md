@@ -15,10 +15,26 @@ Scripts designed to automate setup processes, configurations, or repetitive task
 <details>
 <summary>🐳 Docker & Portainer (Proxmox VE LXC)</summary>
 
-* [**Automated Docker & Portainer Installation for Proxmox LXC**](./scripts/pve/lxc-docker-portainer-install/install.sh)
+* **Automated Docker & Portainer Installation for Proxmox LXC**
+
+   📄[**README**](./scripts/pve/lxc-docker-portainer-install/README.md)
+   💾[**SCRIPT**](./scripts/pve/lxc-docker-portainer-install/install.sh)
   * This Bash script automates the complete installation of Docker and offers an **interactive choice to also install Portainer CE** within a Debian-based Proxmox VE LXC container. It handles system updates/upgrades, dependency installation, and Docker repository setup. **If Portainer installation is chosen,** it also manages its volume creation and attempts to display the Portainer access URL with the server's IP. The script offers an interactive verbose mode.
   * **Functionality:** LXC Setup, Docker Install, **Portainer Install (User Choice)**
   * **Tags:** `Proxmox VE`, `LXC`, `Docker`, `Portainer`, `Bash`, `Automation`, `Server Setup`, `Containerization`, `Debian`, `Ubuntu`
+
+</details>
+
+<details>
+<summary>☁️ Supabase Self-Hosted (Proxmox VE LXC / Debian / Ubuntu)</summary>
+
+* **Automated Supabase Self-Hosted Installation**
+
+   📄[**README**](./scripts/pve/lxc-supabase-install/README.md)
+   💾[**SCRIPT**](./scripts/pve/lxc-supabase-install/install.sh)
+  * This Bash script automates the setup of a self-hosted Supabase instance on a Debian-based system (including Proxmox VE LXC containers). It guides the user through choosing an installation method (General or Advanced), configures the environment, pulls Docker images, and starts the Supabase services. The script emphasizes post-installation security steps. Docker and Docker Compose V2 must be pre-installed.
+  * **Functionality:** Supabase Setup, Docker Compose, Environment Configuration
+  * **Tags:** `Proxmox VE`, `LXC`, `Supabase`, `Self-Hosting`, `Docker`, `Docker Compose`, `Bash`, `Automation`, `Server Setup`, `Debian`, `Ubuntu`, `PaaS`
 
 </details>
 
@@ -37,7 +53,7 @@ Step-by-step instructions, explanations, and best practice guides for various to
   * This guide explains how to efficiently manage models in LM Studio using symbolic links. This method helps save disk space and improves organization, especially if you use models across multiple AI applications.
   * **Resource Type:** Guide
   * **Tags:** `Windows`, `PowerShell`, `Symlinks`, `LLM`, `LM Studio`, `Model Management`, `AI`
-
+  
 </details>
 
 <details>
