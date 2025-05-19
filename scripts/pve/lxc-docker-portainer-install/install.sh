@@ -5,6 +5,7 @@ set -e
 
 # --- Default mode: now set interactively ---
 VERBOSE_MODE=false # Default value if prompt is skipped
+INSTALL_PORTAINER=true # Default value if prompt is skipped
 
 # --- Colors and Formatting ---
 C_OFF='\033[0m'       # Text Reset
@@ -114,6 +115,24 @@ else
 fi
 echo # Blank line
 
+# Interactive selection for Portainer installation
+prompt_user_select "Do you want to install Portainer as well?" PORTAINER_CHOICE "(Y/n)"
+if [[ "$PORTAINER_CHOICE" =~ ^[yY](es|ES)?$ ]] || [[ -z "$PORTAINER_CHOICE" ]]; then # Default to Yes if empty
+    INSTALL_PORTAINER=true
+    print_info "${E_SHIP} Portainer will be installed."
+else
+    INSTALL_PORTAINER=false
+    print_info "Portainer will NOT be installed."
+fi
+echo # Blank line
+
+# --- Calculate total phases ---
+CURRENT_PHASE_NUM=0
+TOTAL_PHASES=2 # System Update & Docker are mandatory
+if [ "$INSTALL_PORTAINER" = true ]; then
+    TOTAL_PHASES=$((TOTAL_PHASES + 1))
+fi
+
 # Check if the script is running with root privileges
 SUDO_CMD=""
 CURRENT_USER_IS_ROOT=false
@@ -131,22 +150,23 @@ else
 fi
 
 # --- System Update & Upgrade ---
-print_phase "0/3" "${E_UPDATE} System Update & Upgrade" # New phase
+CURRENT_PHASE_NUM=$((CURRENT_PHASE_NUM + 1))
+print_phase "$CURRENT_PHASE_NUM/$TOTAL_PHASES" "${E_UPDATE} System Update & Upgrade"
 
 print_step "Updating package lists"
 run_command $SUDO_CMD apt-get update
 print_success "Package lists updated."
 
 print_step "Upgrading installed packages"
-# Note: 'apt-get upgrade -y' can take longer depending on the system scope and pending updates.
 run_command $SUDO_CMD apt-get upgrade -y
 print_success "System packages upgraded."
 
 
 # --- Docker Installation ---
-print_phase "1/3" "${E_PENGUIN} Installing Docker" # Phase number adjusted
+CURRENT_PHASE_NUM=$((CURRENT_PHASE_NUM + 1))
+print_phase "$CURRENT_PHASE_NUM/$TOTAL_PHASES" "${E_PENGUIN} Installing Docker"
 
-print_step "Installing dependencies (ca-certificates, curl)" # Specified dependencies
+print_step "Installing dependencies (ca-certificates, curl)"
 run_command $SUDO_CMD apt-get install -y ca-certificates curl
 print_success "Dependencies installed."
 
@@ -185,7 +205,7 @@ print_step "Installing Docker packages ${E_BOX}"
 run_command $SUDO_CMD apt-get install -y docker-ce docker-ce-cli containerd.io docker-buildx-plugin docker-compose-plugin
 print_success "Docker CE, CLI, Containerd and plugins successfully installed!"
 
-print_step "Cleaning up unused packages and APT cache ${E_CLEAN}" # New step
+print_step "Cleaning up unused packages and APT cache ${E_CLEAN}"
 run_command $SUDO_CMD apt-get autoremove -y
 run_command $SUDO_CMD apt-get clean -y
 print_success "System cleaned up."
@@ -227,88 +247,95 @@ fi
 
 print_success "${E_PENGUIN} Docker installation completed!"
 
-# --- Portainer Installation ---
-print_phase "2/3" "${E_SHIP} Installing Portainer" # Phase number adjusted
+# --- Portainer Installation (Conditional) ---
+if [ "$INSTALL_PORTAINER" = true ]; then
+    CURRENT_PHASE_NUM=$((CURRENT_PHASE_NUM + 1))
+    print_phase "$CURRENT_PHASE_NUM/$TOTAL_PHASES" "${E_SHIP} Installing Portainer"
 
-# --- Portainer Port Configuration ---
-DEFAULT_PORTAINER_HTTP_HOST_PORT="8000"
-PORTAINER_HTTPS_HOST_PORT="9443" # Standard HTTPS port for Portainer UI, used in final message
+    # --- Portainer Port Configuration ---
+    DEFAULT_PORTAINER_HTTP_HOST_PORT="8000"
+    PORTAINER_HTTPS_HOST_PORT="9443" # Standard HTTPS port for Portainer UI, used in final message
 
-echo -e "\n${C_BLUE}${E_GEAR} Portainer Host Port Configuration:${C_OFF}"
-print_info "Portainer UI is primarily accessed via HTTPS (typically port ${PORTAINER_HTTPS_HOST_PORT} on your host)."
-print_info "Portainer also exposes an HTTP service (internally on its port 8000)."
-print_info "This HTTP service usually redirects to HTTPS or is used for other features (like Edge Agent server port)."
+    echo -e "\n${C_BLUE}${E_GEAR} Portainer Host Port Configuration:${C_OFF}"
+    print_info "Portainer UI is primarily accessed via HTTPS (typically port ${PORTAINER_HTTPS_HOST_PORT} on your host)."
+    print_info "Portainer also exposes an HTTP service (internally on its port 8000)."
+    print_info "This HTTP service usually redirects to HTTPS or is used for other features (like Edge Agent server port)."
 
-prompt_user_select "Enter the ${C_BOLD}external host port${C_OFF} to map to Portainer's internal HTTP port (8000)" CHOSEN_PORTAINER_HTTP_HOST_PORT "[default: ${DEFAULT_PORTAINER_HTTP_HOST_PORT}]"
+    prompt_user_select "Enter the ${C_BOLD}external host port${C_OFF} to map to Portainer's internal HTTP port (8000)" CHOSEN_PORTAINER_HTTP_HOST_PORT "[default: ${DEFAULT_PORTAINER_HTTP_HOST_PORT}]"
 
-if [[ -z "$CHOSEN_PORTAINER_HTTP_HOST_PORT" ]]; then
-    PORTAINER_HTTP_HOST_PORT="$DEFAULT_PORTAINER_HTTP_HOST_PORT"
-    print_info "Using default external HTTP port for Portainer: ${C_BOLD}${PORTAINER_HTTP_HOST_PORT}${C_OFF}"
-elif [[ "$CHOSEN_PORTAINER_HTTP_HOST_PORT" =~ ^[0-9]+$ ]] && [ "$CHOSEN_PORTAINER_HTTP_HOST_PORT" -ge 1 ] && [ "$CHOSEN_PORTAINER_HTTP_HOST_PORT" -le 65535 ]; then
-    PORTAINER_HTTP_HOST_PORT="$CHOSEN_PORTAINER_HTTP_HOST_PORT"
-    print_info "Using custom external HTTP port for Portainer: ${C_BOLD}${PORTAINER_HTTP_HOST_PORT}${C_OFF}"
-else
-    print_warning "Invalid port '${CHOSEN_PORTAINER_HTTP_HOST_PORT}'. Must be a number between 1 and 65535 (or empty for default)."
-    print_warning "Using default external HTTP port: ${C_BOLD}${DEFAULT_PORTAINER_HTTP_HOST_PORT}${C_OFF}"
-    PORTAINER_HTTP_HOST_PORT="$DEFAULT_PORTAINER_HTTP_HOST_PORT"
-fi
-echo # Blank line
-
-
-print_step "Creating Portainer data volume 'portainer_data'"
-if $SUDO_CMD docker volume inspect portainer_data >/dev/null 2>&1; then
-    print_info "Docker volume 'portainer_data' already exists."
-else
-    if [ "$VERBOSE_MODE" = true ]; then
-        $SUDO_CMD docker volume create portainer_data
+    if [[ -z "$CHOSEN_PORTAINER_HTTP_HOST_PORT" ]]; then
+        PORTAINER_HTTP_HOST_PORT="$DEFAULT_PORTAINER_HTTP_HOST_PORT"
+        print_info "Using default external HTTP port for Portainer: ${C_BOLD}${PORTAINER_HTTP_HOST_PORT}${C_OFF}"
+    elif [[ "$CHOSEN_PORTAINER_HTTP_HOST_PORT" =~ ^[0-9]+$ ]] && [ "$CHOSEN_PORTAINER_HTTP_HOST_PORT" -ge 1 ] && [ "$CHOSEN_PORTAINER_HTTP_HOST_PORT" -le 65535 ]; then
+        PORTAINER_HTTP_HOST_PORT="$CHOSEN_PORTAINER_HTTP_HOST_PORT"
+        print_info "Using custom external HTTP port for Portainer: ${C_BOLD}${PORTAINER_HTTP_HOST_PORT}${C_OFF}"
     else
-        $SUDO_CMD docker volume create portainer_data >/dev/null
+        print_warning "Invalid port '${CHOSEN_PORTAINER_HTTP_HOST_PORT}'. Must be a number between 1 and 65535 (or empty for default)."
+        print_warning "Using default external HTTP port: ${C_BOLD}${DEFAULT_PORTAINER_HTTP_HOST_PORT}${C_OFF}"
+        PORTAINER_HTTP_HOST_PORT="$DEFAULT_PORTAINER_HTTP_HOST_PORT"
     fi
-    print_success "Docker volume 'portainer_data' created."
-fi
+    echo # Blank line
 
-print_step "Starting/updating Portainer server container"
-container_name="portainer"
-if $SUDO_CMD docker ps -a --format '{{.Names}}' | grep -Eq "^${container_name}$"; then
-    print_warning "A container named '${C_BOLD}${container_name}${C_OFF}' already exists."
-    prompt_user_select "Do you want to stop and remove the existing Portainer container to recreate it?" confirm_remove "(y/N)"
-    if [[ "$confirm_remove" =~ ^[yY](es|ES)?$ ]]; then
-        print_step "Stopping and removing existing Portainer container..."
-        run_command $SUDO_CMD docker stop "$container_name"
-        run_command $SUDO_CMD docker rm "$container_name"
-        print_success "Existing Portainer container removed."
+    print_step "Creating Portainer data volume 'portainer_data'"
+    if $SUDO_CMD docker volume inspect portainer_data >/dev/null 2>&1; then
+        print_info "Docker volume 'portainer_data' already exists."
     else
-        print_warning "Portainer installation aborted as a container with the same name exists and was not removed."
-        exit 1 # Exit script if user chooses not to remove existing container
+        if [ "$VERBOSE_MODE" = true ]; then
+            $SUDO_CMD docker volume create portainer_data
+        else
+            $SUDO_CMD docker volume create portainer_data >/dev/null
+        fi
+        print_success "Docker volume 'portainer_data' created."
     fi
-fi
 
-print_step "Starting Portainer server container (portainer/portainer-ce:lts)"
-# Portainer internal HTTP port is 8000, internal HTTPS port is 9443.
-# We map host's $PORTAINER_HTTP_HOST_PORT to container's 8000.
-# We map host's $PORTAINER_HTTPS_HOST_PORT to container's 9443.
-if [ "$VERBOSE_MODE" = true ]; then
-    $SUDO_CMD docker run -d \
-        -p "${PORTAINER_HTTP_HOST_PORT}":8000 \
-        -p "${PORTAINER_HTTPS_HOST_PORT}":9443 \
-        --name "$container_name" \
-        --restart=always \
-        -v /var/run/docker.sock:/var/run/docker.sock \
-        -v portainer_data:/data \
-        portainer/portainer-ce:lts
-else
-    $SUDO_CMD docker run -d \
-        -p "${PORTAINER_HTTP_HOST_PORT}":8000 \
-        -p "${PORTAINER_HTTPS_HOST_PORT}":9443 \
-        --name "$container_name" \
-        --restart=always \
-        -v /var/run/docker.sock:/var/run/docker.sock \
-        -v portainer_data:/data \
-        portainer/portainer-ce:lts >/dev/null
-fi
-print_success "Portainer server container successfully started!"
+    print_step "Starting/updating Portainer server container"
+    container_name="portainer"
+    if $SUDO_CMD docker ps -a --format '{{.Names}}' | grep -Eq "^${container_name}$"; then
+        print_warning "A container named '${C_BOLD}${container_name}${C_OFF}' already exists."
+        prompt_user_select "Do you want to stop and remove the existing Portainer container to recreate it?" confirm_remove "(y/N)"
+        if [[ "$confirm_remove" =~ ^[yY](es|ES)?$ ]]; then
+            print_step "Stopping and removing existing Portainer container..."
+            run_command $SUDO_CMD docker stop "$container_name"
+            run_command $SUDO_CMD docker rm "$container_name"
+            print_success "Existing Portainer container removed."
+        else
+            print_warning "Portainer installation aborted as a container with the same name exists and was not removed."
+            # We don't exit the whole script, just skip Portainer specific parts.
+            # The final message will reflect that Portainer might not be fully set up.
+            echo -e "${C_RED}${E_WARN}  Portainer installation will be skipped.${C_OFF}"
+            INSTALL_PORTAINER=false # Mark as not installed for final message
+        fi
+    fi
 
-print_success "${E_SHIP} Portainer installation completed!"
+    if [ "$INSTALL_PORTAINER" = true ]; then # Check again if removal was successful or if user chose not to remove
+        print_step "Starting Portainer server container (portainer/portainer-ce:lts)"
+        # Portainer internal HTTP port is 8000, internal HTTPS port is 9443.
+        # We map host's $PORTAINER_HTTP_HOST_PORT to container's 8000.
+        # We map host's $PORTAINER_HTTPS_HOST_PORT to container's 9443.
+        if [ "$VERBOSE_MODE" = true ]; then
+            $SUDO_CMD docker run -d \
+                -p "${PORTAINER_HTTP_HOST_PORT}":8000 \
+                -p "${PORTAINER_HTTPS_HOST_PORT}":9443 \
+                --name "$container_name" \
+                --restart=always \
+                -v /var/run/docker.sock:/var/run/docker.sock \
+                -v portainer_data:/data \
+                portainer/portainer-ce:lts
+        else
+            $SUDO_CMD docker run -d \
+                -p "${PORTAINER_HTTP_HOST_PORT}":8000 \
+                -p "${PORTAINER_HTTPS_HOST_PORT}":9443 \
+                --name "$container_name" \
+                --restart=always \
+                -v /var/run/docker.sock:/var/run/docker.sock \
+                -v portainer_data:/data \
+                portainer/portainer-ce:lts >/dev/null
+        fi
+        print_success "Portainer server container successfully started!"
+        print_success "${E_SHIP} Portainer installation completed!"
+    fi
+fi # End of conditional Portainer installation
+
 
 # --- Final Message ---
 SERVER_IP=$(get_primary_ip) # Determine IP address
@@ -316,30 +343,35 @@ SERVER_IP=$(get_primary_ip) # Determine IP address
 echo -e "\n${C_GREEN}${C_BOLD}=========================================================${C_OFF}"
 echo -e "${C_GREEN}${C_BOLD}      ${E_PARTY} Installation successfully completed! ${E_PARTY}      ${C_OFF}"
 echo -e "${C_GREEN}${C_BOLD}=========================================================${C_OFF}\n"
-echo -e "${C_WHITE}Portainer should now be accessible via HTTPS at:${C_OFF}"
 
-if [ "$SERVER_IP" == "NO_IP_FOUND" ]; then
-    echo -e "  ${C_YELLOW}${E_WARN} Could not automatically determine server IP address. ${E_PROMPT}${C_OFF}"
-    echo -e "  ${C_WHITE}Please replace ${C_BOLD}<YOUR_SERVER_IP_OR_HOSTNAME>${C_OFF} with your actual server IP or hostname:${C_OFF}"
-    echo -e "  Primary access: ${C_UNDERLINE}${C_BLUE}https://<YOUR_SERVER_IP_OR_HOSTNAME>:${PORTAINER_HTTPS_HOST_PORT}${C_OFF} ${E_LINK}"
-    echo -e "  (Copy: https://<YOUR_SERVER_IP_OR_HOSTNAME>:${PORTAINER_HTTPS_HOST_PORT})"
-else
-    echo -e "  Primary access: ${C_UNDERLINE}${C_BLUE}https://${SERVER_IP}:${PORTAINER_HTTPS_HOST_PORT}${C_OFF} ${E_LINK}"
-    echo -e "  (If the link is not clickable, copy: https://${SERVER_IP}:${PORTAINER_HTTPS_HOST_PORT})"
-fi
+if [ "$INSTALL_PORTAINER" = true ]; then
+    echo -e "${C_WHITE}Portainer should now be accessible via HTTPS at:${C_OFF}"
 
-if [ "$SERVER_IP" != "NO_IP_FOUND" ]; then
-    if [ "$PORTAINER_HTTP_HOST_PORT" != "$DEFAULT_PORTAINER_HTTP_HOST_PORT" ]; then
-        echo -e "\n${C_WHITE}Note: Portainer's internal HTTP port (8000) has been mapped to external host port ${C_BOLD}${PORTAINER_HTTP_HOST_PORT}${C_OFF}.${C_OFF}"
-        echo -e "${C_WHITE}Accessing http://${SERVER_IP}:${PORTAINER_HTTP_HOST_PORT} will typically redirect to the HTTPS URL above.${C_OFF}"
+    if [ "$SERVER_IP" == "NO_IP_FOUND" ]; then
+        echo -e "  ${C_YELLOW}${E_WARN} Could not automatically determine server IP address. ${E_PROMPT}${C_OFF}"
+        echo -e "  ${C_WHITE}Please replace ${C_BOLD}<YOUR_SERVER_IP_OR_HOSTNAME>${C_OFF} with your actual server IP or hostname:${C_OFF}"
+        echo -e "  Primary access: ${C_UNDERLINE}${C_BLUE}https://<YOUR_SERVER_IP_OR_HOSTNAME>:${PORTAINER_HTTPS_HOST_PORT}${C_OFF} ${E_LINK}"
+        echo -e "  (Copy: https://<YOUR_SERVER_IP_OR_HOSTNAME>:${PORTAINER_HTTPS_HOST_PORT})"
     else
-        # Default HTTP port 8000 is used
-        echo -e "${C_DIM}HTTP access (http://${SERVER_IP}:${PORTAINER_HTTP_HOST_PORT}) usually redirects to the HTTPS URL above.${C_OFF}"
+        echo -e "  Primary access: ${C_UNDERLINE}${C_BLUE}https://${SERVER_IP}:${PORTAINER_HTTPS_HOST_PORT}${C_OFF} ${E_LINK}"
+        echo -e "  (If the link is not clickable, copy: https://${SERVER_IP}:${PORTAINER_HTTPS_HOST_PORT})"
     fi
+
+    if [ "$SERVER_IP" != "NO_IP_FOUND" ]; then
+        if [ "$PORTAINER_HTTP_HOST_PORT" != "$DEFAULT_PORTAINER_HTTP_HOST_PORT" ]; then
+            echo -e "\n${C_WHITE}Note: Portainer's internal HTTP port (8000) has been mapped to external host port ${C_BOLD}${PORTAINER_HTTP_HOST_PORT}${C_OFF}.${C_OFF}"
+            echo -e "${C_WHITE}Accessing http://${SERVER_IP}:${PORTAINER_HTTP_HOST_PORT} will typically redirect to the HTTPS URL above.${C_OFF}"
+        else
+            # Default HTTP port 8000 is used
+            echo -e "${C_DIM}HTTP access (http://${SERVER_IP}:${PORTAINER_HTTP_HOST_PORT}) usually redirects to the HTTPS URL above.${C_OFF}"
+        fi
+    fi
+    echo -e "\n${C_WHITE}On first access, you will need to create an administrator account for Portainer.${C_OFF}"
+else
+    echo -e "${C_WHITE}Docker was successfully installed.${C_OFF}"
+    echo -e "${C_WHITE}You can now manage Docker containers via the command line.${C_OFF}"
 fi
 
-
-echo -e "\n${C_WHITE}On first access, you will need to create an administrator account for Portainer.${C_OFF}"
 
 if [ -n "$target_user_for_docker_group" ] && [ "$target_user_for_docker_group" != "root" ] && [ "$CURRENT_USER_IS_ROOT" = false ]; then
   echo -e "\n${C_YELLOW}${E_WARN}  IMPORTANT: To run Docker commands as user '${C_BOLD}$target_user_for_docker_group${C_OFF}' without 'sudo',"
@@ -348,6 +380,11 @@ elif [ -n "$target_user_for_docker_group" ] && [ "$target_user_for_docker_group"
   echo -e "\n${C_YELLOW}${E_INFO}  NOTE: User '${C_BOLD}$target_user_for_docker_group${C_OFF}' has been added to the Docker group."
   echo -e "  For them to use Docker without 'sudo', they must ${C_BOLD}log out and log back in${C_OFF} or run '${C_BOLD}newgrp docker${C_OFF}'."
 fi
-echo -e "\n${C_CYAN}Enjoy Docker and Portainer! ${E_ROCKET}${C_OFF}\n"
+
+if [ "$INSTALL_PORTAINER" = true ]; then
+    echo -e "\n${C_CYAN}Enjoy Docker and Portainer! ${E_ROCKET}${C_OFF}\n"
+else
+    echo -e "\n${C_CYAN}Enjoy Docker! ${E_ROCKET}${C_OFF}\n"
+fi
 
 exit 0
