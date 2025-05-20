@@ -8,6 +8,7 @@ VERBOSE_MODE=false
 INSTALL_METHOD="general" # Default to general, will be prompted
 SUPABASE_CODE_DIR="supabase_src_temp" # Temporary directory for git clone
 PROJECT_DIR_NAME="supabase-project" # Name of the final project directory
+ACCESS_TYPE="local" # Default access type, will be prompted
 
 # --- Colors and Formatting ---
 C_OFF='\033[0m'       # Text Reset
@@ -39,6 +40,8 @@ E_DB="💾"    # For Database
 E_SHIELD="🛡️" # For Security
 E_UPDATE="🔄" # For updates
 E_CLEAN="🧹"  # For cleanup tasks
+E_EYES="👀"   # For verbose mode active
+E_NETWORK="🌐" # For network/remote access
 
 # --- Helper functions for output ---
 print_header() {
@@ -140,6 +143,23 @@ else
 fi
 echo
 
+# Interactive selection for Access Type (Localhost vs Remote)
+print_info "${E_NETWORK} Supabase Access Configuration:"
+print_info "  This determines how URLs (SITE_URL, API_EXTERNAL_URL, SUPABASE_PUBLIC_URL) are set in the .env file."
+print_info "  1. ${C_BOLD}Local:${C_OFF} URLs will be set to 'localhost'. Suitable if accessing Supabase only from the same machine where Docker is running."
+print_info "  2. ${C_BOLD}Remote:${C_OFF} URLs will be set to this server's IP or a custom domain. Necessary if accessing Supabase from other devices on your network or the internet."
+prompt_user_select "Configure Supabase for Local or Remote access? (1 for Local, 2 for Remote)" ACCESS_TYPE_CHOICE "[default: 1]"
+
+if [[ "$ACCESS_TYPE_CHOICE" == "2" ]]; then
+    ACCESS_TYPE="remote"
+    print_info "Configuring for ${C_BOLD}Remote Access${C_OFF}. URLs will be customized."
+else
+    ACCESS_TYPE="local" # Default or if '1' or invalid is entered
+    print_info "Configuring for ${C_BOLD}Local Access${C_OFF}. URLs will use 'localhost'."
+fi
+echo
+
+
 # --- Calculate total phases ---
 CURRENT_PHASE_NUM=0
 TOTAL_PHASES=4 # Prep, Get Code, Configure & Run, Post-Install
@@ -157,7 +177,7 @@ else
   print_info "Script is running as ${C_BOLD}root${C_OFF}."
 fi
 
-# --- Phase 0: System Preparation & Prerequisite Checks ---
+# --- Phase 1: System Preparation & Prerequisite Checks ---
 CURRENT_PHASE_NUM=$((CURRENT_PHASE_NUM + 1))
 print_phase "$CURRENT_PHASE_NUM" "${E_UPDATE} System Preparation & Prerequisite Checks"
 
@@ -186,7 +206,7 @@ if ! $SUDO_CMD docker compose version &> /dev/null; then # Check if 'docker comp
 fi
 print_success "Docker and Docker Compose seem to be available."
 
-# --- Phase 1: Get Supabase Code ---
+# --- Phase 2: Get Supabase Code ---
 CURRENT_PHASE_NUM=$((CURRENT_PHASE_NUM + 1))
 print_phase "$CURRENT_PHASE_NUM" "${E_BOX} Fetching Supabase Docker Configuration"
 
@@ -224,7 +244,7 @@ print_step "Cleaning up temporary source directory '$SUPABASE_CODE_DIR'"
 run_command $SUDO_CMD rm -rf "$SUPABASE_CODE_DIR"
 print_success "Temporary source directory removed."
 
-# --- Phase 2: Configure Supabase & Docker Compose ---
+# --- Phase 3: Configure Supabase & Docker Compose ---
 CURRENT_PHASE_NUM=$((CURRENT_PHASE_NUM + 1))
 print_phase "$CURRENT_PHASE_NUM" "${E_GEAR} Configuring Supabase Environment"
 
@@ -237,11 +257,9 @@ echo # Blank line for readability before next prompt
 DEFAULT_DOCKER_SOCKET="/var/run/docker.sock"
 prompt_user_select "The default Docker socket in .env is '$DEFAULT_DOCKER_SOCKET'. Do you need to change this (e.g., for rootless Docker)?" CHANGE_SOCKET "(y/N)"
 if [[ "$CHANGE_SOCKET" =~ ^[yY](es|ES)?$ ]]; then
-    prompt_user_select "Enter your Docker socket location (e.g., /run/user/1000/docker.sock)" DOCKER_SOCKET_PATH_CUSTOM
+    prompt_user_select "Enter your Docker socket location (e.g., /run/user/1000/docker.sock)" DOCKER_SOCKET_PATH_CUSTOM "" # No default here
     if [ -n "$DOCKER_SOCKET_PATH_CUSTOM" ]; then
         print_step "Updating DOCKER_SOCKET_LOCATION in .env to '$DOCKER_SOCKET_PATH_CUSTOM'"
-        # Use sed to replace the value. Regex tries to match the line and replace value.
-        # Using a different delimiter for sed like # or | if path contains /
         run_command sed -i "s|^DOCKER_SOCKET_LOCATION=.*|DOCKER_SOCKET_LOCATION=${DOCKER_SOCKET_PATH_CUSTOM}|" .env
         print_success "DOCKER_SOCKET_LOCATION updated in .env."
     else
@@ -252,6 +270,97 @@ else
 fi
 echo
 
+# --- Configure Public Supabase URLs based on ACCESS_TYPE ---
+print_step "Configuring Supabase Public URLs (Site, API, Studio)"
+
+# Define the target variables
+TARGET_SITE_URL_VAR="SITE_URL"
+TARGET_API_URL_VAR="API_EXTERNAL_URL"
+TARGET_PUBLIC_URL_VAR="SUPABASE_PUBLIC_URL"
+
+# Ports associated with the default URLs
+DEFAULT_SITE_URL_PORT="3000"
+DEFAULT_API_PUBLIC_URL_PORT="8000" # This is KONG_HTTP_PORT
+
+# Initialize final URLs with localhost defaults
+FINAL_SITE_URL="http://localhost:${DEFAULT_SITE_URL_PORT}"
+FINAL_API_URL="http://localhost:${DEFAULT_API_PUBLIC_URL_PORT}"
+FINAL_PUBLIC_URL="http://localhost:${DEFAULT_API_PUBLIC_URL_PORT}"
+
+if [ "$ACCESS_TYPE" == "remote" ]; then
+    print_info "Remote access selected. Configuring custom URLs."
+    SERVER_IP_FOR_URL=$(get_primary_ip)
+
+    if [ "$SERVER_IP_FOR_URL" != "NO_IP_FOUND" ]; then
+        print_info "Detected server IP: ${C_BOLD}${SERVER_IP_FOR_URL}${C_OFF}"
+        prompt_user_select "Use this auto-detected IP for Supabase public URLs (e.g., http://${SERVER_IP_FOR_URL}:<port>)?" USE_AUTO_IP "(Y/n)"
+
+        if [[ "$USE_AUTO_IP" =~ ^[yY](es|ES)?$ ]] || [[ -z "$USE_AUTO_IP" ]]; then # Default to Yes
+            FINAL_SITE_URL="http://${SERVER_IP_FOR_URL}:${DEFAULT_SITE_URL_PORT}"
+            FINAL_API_URL="http://${SERVER_IP_FOR_URL}:${DEFAULT_API_PUBLIC_URL_PORT}"
+            FINAL_PUBLIC_URL="http://${SERVER_IP_FOR_URL}:${DEFAULT_API_PUBLIC_URL_PORT}"
+        else
+            print_info "Manual URL configuration selected."
+            prompt_user_select "Enter the base public URL for Supabase (e.g., http://your-server-ip or https://your.domain.com, without port)" MANUAL_BASE_URL ""
+            if [ -n "$MANUAL_BASE_URL" ]; then
+                FINAL_SITE_URL="${MANUAL_BASE_URL}:${DEFAULT_SITE_URL_PORT}"
+                FINAL_API_URL="${MANUAL_BASE_URL}:${DEFAULT_API_PUBLIC_URL_PORT}"
+                FINAL_PUBLIC_URL="${MANUAL_BASE_URL}:${DEFAULT_API_PUBLIC_URL_PORT}"
+            else
+                print_warning "No manual base URL entered. Default 'localhost' URLs will be used for remote setup, which is likely incorrect."
+                # URLs remain localhost, user was warned
+            fi
+        fi
+    else # IP not found for remote setup
+        print_warning "Could not automatically determine server IP for remote setup."
+        print_info "You will need to enter the base URL manually."
+        prompt_user_select "Enter the base public URL for Supabase (e.g., http://your-server-ip or https://your.domain.com, without port)" MANUAL_BASE_URL ""
+        if [ -n "$MANUAL_BASE_URL" ]; then
+            FINAL_SITE_URL="${MANUAL_BASE_URL}:${DEFAULT_SITE_URL_PORT}"
+            FINAL_API_URL="${MANUAL_BASE_URL}:${DEFAULT_API_PUBLIC_URL_PORT}"
+            FINAL_PUBLIC_URL="${MANUAL_BASE_URL}:${DEFAULT_API_PUBLIC_URL_PORT}"
+        else
+            print_warning "No manual base URL entered. Default 'localhost' URLs will be used for remote setup, which is likely incorrect."
+            # URLs remain localhost, user was warned
+        fi
+    fi
+
+    # Update .env file only if remote access was chosen and URLs are not localhost
+    print_info "Applying URL configuration to .env:"
+    print_info "  ${TARGET_SITE_URL_VAR}=${C_BOLD}${FINAL_SITE_URL}${C_OFF}"
+    print_info "  ${TARGET_API_URL_VAR}=${C_BOLD}${FINAL_API_URL}${C_OFF}"
+    print_info "  ${TARGET_PUBLIC_URL_VAR}=${C_BOLD}${FINAL_PUBLIC_URL}${C_OFF}"
+
+    if grep -q "^${TARGET_SITE_URL_VAR}=" .env; then
+        run_command sed -i "s|^${TARGET_SITE_URL_VAR}=.*|${TARGET_SITE_URL_VAR}=${FINAL_SITE_URL}|" .env
+        print_success "'${TARGET_SITE_URL_VAR}' updated."
+    else
+        print_warning "Variable '${TARGET_SITE_URL_VAR}' not found in .env."
+    fi
+
+    if grep -q "^${TARGET_API_URL_VAR}=" .env; then
+        run_command sed -i "s|^${TARGET_API_URL_VAR}=.*|${TARGET_API_URL_VAR}=${FINAL_API_URL}|" .env
+        print_success "'${TARGET_API_URL_VAR}' updated."
+    else
+        print_warning "Variable '${TARGET_API_URL_VAR}' not found in .env."
+    fi
+
+    if grep -q "^${TARGET_PUBLIC_URL_VAR}=" .env; then
+        run_command sed -i "s|^${TARGET_PUBLIC_URL_VAR}=.*|${TARGET_PUBLIC_URL_VAR}=${FINAL_PUBLIC_URL}|" .env
+        print_success "'${TARGET_PUBLIC_URL_VAR}' updated."
+    else
+        print_warning "Variable '${TARGET_PUBLIC_URL_VAR}' not found in .env."
+    fi
+else # Local access chosen
+    print_info "Local access selected. Default 'localhost' URLs will be used:"
+    print_info "  ${TARGET_SITE_URL_VAR}=${C_BOLD}${FINAL_SITE_URL}${C_OFF}"
+    print_info "  ${TARGET_API_URL_VAR}=${C_BOLD}${FINAL_API_URL}${C_OFF}"
+    print_info "  ${TARGET_PUBLIC_URL_VAR}=${C_BOLD}${FINAL_PUBLIC_URL}${C_OFF}"
+    print_info "No changes made to .env for these URLs as defaults are 'localhost'."
+fi
+echo
+# --- END Public URL Configuration ---
+
 print_step "Pulling latest Docker images for Supabase (this may take a while)"
 run_command_show_output $SUDO_CMD docker compose pull # Show output as it can be long
 print_success "Docker images pulled."
@@ -260,7 +369,7 @@ print_step "Starting Supabase services in detached mode"
 run_command $SUDO_CMD docker compose up -d
 print_success "Supabase services started."
 
-# --- Phase 3: Post-Installation & Verification ---
+# --- Phase 4: Post-Installation & Verification ---
 CURRENT_PHASE_NUM=$((CURRENT_PHASE_NUM + 1))
 print_phase "$CURRENT_PHASE_NUM" "${E_CHECK} Post-Installation & Verification"
 
@@ -276,19 +385,27 @@ print_info "If any service is 'created' but not running, try 'sudo docker compos
 echo
 
 # --- Final Message ---
-SERVER_IP=$(get_primary_ip)
+STUDIO_ACCESS_URL="$FINAL_API_URL"
 
 echo -e "\n${C_GREEN}${C_BOLD}==============================================================${C_OFF}"
 echo -e "${C_GREEN}${C_BOLD}      ${E_PARTY} Supabase Self-Hosting Setup Complete! ${E_PARTY}      ${C_OFF}"
 echo -e "${C_GREEN}${C_BOLD}==============================================================${C_OFF}\n"
 
 echo -e "${C_WHITE}You should now be able to access Supabase Studio:${C_OFF}"
-if [ "$SERVER_IP" == "NO_IP_FOUND" ]; then
-    echo -e "  ${C_YELLOW}${E_WARN} Could not automatically determine server IP address. ${E_PROMPT}${C_OFF}"
-    echo -e "  ${C_WHITE}Access URL: ${C_UNDERLINE}${C_BLUE}http://<your-ip-address>:8000${C_OFF} ${E_LINK}"
-else
-    echo -e "  Access URL: ${C_UNDERLINE}${C_BLUE}http://${SERVER_IP}:8000${C_OFF} ${E_LINK}"
-    echo -e "  (If not clickable, copy: http://${SERVER_IP}:8000)"
+if [ "$ACCESS_TYPE" == "local" ]; then
+    echo -e "  Access URL (local): ${C_UNDERLINE}${C_BLUE}${STUDIO_ACCESS_URL}${C_OFF} ${E_LINK}"
+    echo -e "  ${C_YELLOW}${E_INFO} Configured for local access. Access from the same machine where Docker is running.${C_OFF}"
+elif [[ "$STUDIO_ACCESS_URL" == *"localhost"* ]]; then # Remote selected, but somehow still localhost (e.g. no manual input)
+    SERVER_IP_HINT=$(get_primary_ip)
+    echo -e "  Access URL (likely incorrect for remote): ${C_UNDERLINE}${C_BLUE}${STUDIO_ACCESS_URL}${C_OFF} ${E_LINK}"
+    if [ "$SERVER_IP_HINT" != "NO_IP_FOUND" ]; then
+        echo -e "  ${C_YELLOW}${E_WARN} URLs are set to 'localhost' despite remote setup. Try: ${C_UNDERLINE}${C_BLUE}http://${SERVER_IP_HINT}:${DEFAULT_API_PUBLIC_URL_PORT}${C_OFF}${C_OFF}"
+    else
+        echo -e "  ${C_YELLOW}${E_WARN} URLs are set to 'localhost' despite remote setup. You may need to use your server's actual IP or domain.${C_OFF}"
+    fi
+else # Remote selected and URL is not localhost
+    echo -e "  Access URL (remote): ${C_UNDERLINE}${C_BLUE}${STUDIO_ACCESS_URL}${C_OFF} ${E_LINK}"
+    echo -e "  (If not clickable, copy: ${STUDIO_ACCESS_URL})"
 fi
 echo
 
@@ -307,8 +424,5 @@ echo
 print_info "Supabase project files are located in: ${C_BOLD}${PROJECT_ABS_PATH}${C_OFF}"
 print_info "To manage your Supabase services, navigate to this directory and use 'sudo docker compose [up|down|logs|ps|etc.]'."
 echo -e "\n${C_CYAN}Enjoy your self-hosted Supabase instance! ${E_ROCKET}${C_OFF}\n"
-
-# Go back to original directory if cd was used
-cd ..
 
 exit 0
